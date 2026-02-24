@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: deployments/Dockerfile
+    container_name: wosb-market-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./volumes/data:/data
+    environment:
+      - DATABASE_PATH=/data/database.db
+      - IMAGE_STORAGE_PATH=/data/images
+      - TZ=UTC
+    # Health check to monitor bot status
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "wosbTrade"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  data:
+    driver: local
