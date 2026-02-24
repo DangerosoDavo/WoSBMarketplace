@@ -114,6 +114,90 @@ CREATE TABLE IF NOT EXISTS guild_settings (
 	configured_by TEXT NOT NULL,
 	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Player profiles for trading
+CREATE TABLE IF NOT EXISTS player_profiles (
+	user_id TEXT PRIMARY KEY,
+	ingame_name TEXT NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Player-created trade orders (distinct from OCR market data)
+CREATE TABLE IF NOT EXISTS player_orders (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id TEXT NOT NULL,
+	item_id INTEGER NOT NULL,
+	order_type TEXT NOT NULL CHECK(order_type IN ('buy', 'sell')),
+	price INTEGER NOT NULL,
+	quantity INTEGER NOT NULL,
+	port_id INTEGER,
+	notes TEXT,
+	ingame_name TEXT NOT NULL,
+	status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'completed', 'cancelled')),
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMP NOT NULL,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+	FOREIGN KEY (port_id) REFERENCES ports(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_orders_user ON player_orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_player_orders_item ON player_orders(item_id);
+CREATE INDEX IF NOT EXISTS idx_player_orders_status ON player_orders(status);
+CREATE INDEX IF NOT EXISTS idx_player_orders_type ON player_orders(order_type);
+CREATE INDEX IF NOT EXISTS idx_player_orders_expires ON player_orders(expires_at);
+CREATE INDEX IF NOT EXISTS idx_player_orders_port ON player_orders(port_id);
+
+-- Trade conversations between players
+CREATE TABLE IF NOT EXISTS trade_conversations (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	order_id INTEGER NOT NULL,
+	initiator_user_id TEXT NOT NULL,
+	initiator_ingame_name TEXT NOT NULL,
+	creator_user_id TEXT NOT NULL,
+	creator_ingame_name TEXT NOT NULL,
+	status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'closed')),
+	started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	ended_at TIMESTAMP,
+	last_message_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (order_id) REFERENCES player_orders(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_trade_conv_initiator ON trade_conversations(initiator_user_id);
+CREATE INDEX IF NOT EXISTS idx_trade_conv_creator ON trade_conversations(creator_user_id);
+CREATE INDEX IF NOT EXISTS idx_trade_conv_status ON trade_conversations(status);
+CREATE INDEX IF NOT EXISTS idx_trade_conv_order ON trade_conversations(order_id);
+
+-- Trade bans
+CREATE TABLE IF NOT EXISTS trade_bans (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id TEXT NOT NULL,
+	reason TEXT NOT NULL,
+	banned_by TEXT NOT NULL,
+	banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMP,
+	active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_trade_bans_user ON trade_bans(user_id);
+CREATE INDEX IF NOT EXISTS idx_trade_bans_active ON trade_bans(active);
+
+-- Trade reports
+CREATE TABLE IF NOT EXISTS trade_reports (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	reporter_user_id TEXT NOT NULL,
+	reported_user_id TEXT NOT NULL,
+	order_id INTEGER,
+	reason TEXT NOT NULL,
+	status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'reviewed', 'dismissed')),
+	reviewed_by TEXT,
+	reviewed_at TIMESTAMP,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (order_id) REFERENCES player_orders(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_trade_reports_reported ON trade_reports(reported_user_id);
+CREATE INDEX IF NOT EXISTS idx_trade_reports_status ON trade_reports(status);
 `
 
 type DB struct {
@@ -223,4 +307,69 @@ type AuditLog struct {
 	UserID    string
 	Timestamp time.Time
 	Details   string
+}
+
+// PlayerProfile represents a player's trading profile
+type PlayerProfile struct {
+	UserID     string
+	IngameName string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+// PlayerOrder represents a player-created trade order
+type PlayerOrder struct {
+	ID        int
+	UserID    string
+	ItemID    int
+	OrderType string
+	Price     int
+	Quantity  int
+	PortID    *int
+	Notes     string
+	IngameName string
+	Status    string // "active", "completed", "cancelled"
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	// Populated via joins
+	Item *Item
+	Port *Port
+}
+
+// TradeConversation represents a DM relay between two players
+type TradeConversation struct {
+	ID                  int
+	OrderID             int
+	InitiatorUserID     string
+	InitiatorIngameName string
+	CreatorUserID       string
+	CreatorIngameName   string
+	Status              string // "active", "closed"
+	StartedAt           time.Time
+	EndedAt             *time.Time
+	LastMessageAt       time.Time
+}
+
+// TradeBan represents a ban preventing a user from trading
+type TradeBan struct {
+	ID        int
+	UserID    string
+	Reason    string
+	BannedBy  string
+	BannedAt  time.Time
+	ExpiresAt *time.Time // nil = permanent
+	Active    bool
+}
+
+// TradeReport represents a user report against a trader
+type TradeReport struct {
+	ID             int
+	ReporterUserID string
+	ReportedUserID string
+	OrderID        *int
+	Reason         string
+	Status         string // "pending", "reviewed", "dismissed"
+	ReviewedBy     string
+	ReviewedAt     *time.Time
+	CreatedAt      time.Time
 }

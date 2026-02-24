@@ -388,6 +388,263 @@ var commands = []*discordgo.ApplicationCommand{
 		Name:        "config-show",
 		Description: "Show current server configuration",
 	},
+
+	// Player Trading Commands
+	{
+		Name:        "trade-set-name",
+		Description: "Set your in-game name for trading",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "name",
+				Description: "Your in-game character name",
+				Required:    true,
+			},
+		},
+	},
+	{
+		Name:        "trade-create",
+		Description: "Create a buy or sell order",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "type",
+				Description: "Order type",
+				Required:    true,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{Name: "Buy (I want to buy)", Value: "buy"},
+					{Name: "Sell (I want to sell)", Value: "sell"},
+				},
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "item",
+				Description: "Item name (fuzzy match supported)",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "price",
+				Description: "Price per unit in gold",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "quantity",
+				Description: "Number of units",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "duration",
+				Description: "How long the order stays active",
+				Required:    true,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{Name: "1 Day", Value: "1d"},
+					{Name: "3 Days", Value: "3d"},
+					{Name: "7 Days", Value: "7d"},
+					{Name: "14 Days", Value: "14d"},
+				},
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "port",
+				Description: "Port name (optional, fuzzy match)",
+				Required:    false,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "notes",
+				Description: "Additional notes (optional)",
+				Required:    false,
+			},
+		},
+	},
+	{
+		Name:        "trade-search",
+		Description: "Search player trade orders",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "item",
+				Description: "Item name to search for",
+				Required:    false,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "type",
+				Description: "Filter by order type",
+				Required:    false,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{Name: "Buy Orders", Value: "buy"},
+					{Name: "Sell Orders", Value: "sell"},
+				},
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "port",
+				Description: "Filter by port",
+				Required:    false,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "min-price",
+				Description: "Minimum price filter",
+				Required:    false,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "max-price",
+				Description: "Maximum price filter",
+				Required:    false,
+			},
+		},
+	},
+	{
+		Name:        "trade-my-orders",
+		Description: "View your active trade orders",
+	},
+	{
+		Name:        "trade-cancel",
+		Description: "Cancel one of your trade orders",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "order-id",
+				Description: "The order ID to cancel",
+				Required:    true,
+			},
+		},
+	},
+	{
+		Name:        "trade-contact",
+		Description: "Contact the creator of a trade order via DM",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "order-id",
+				Description: "The order ID you want to discuss",
+				Required:    true,
+			},
+		},
+	},
+	{
+		Name:        "trade-end",
+		Description: "End your active trade conversation",
+	},
+	{
+		Name:        "trade-report",
+		Description: "Report a trader for misconduct",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "order-id",
+				Description: "The order ID of the trader you want to report",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "reason",
+				Description: "Why you are reporting this trader",
+				Required:    true,
+			},
+		},
+	},
+
+	// Admin Commands - Trade Moderation
+	{
+		Name:        "admin-trade-ban",
+		Description: "Ban a user from trading (admin only)",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionUser,
+				Name:        "user",
+				Description: "The user to ban from trading",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "reason",
+				Description: "Reason for the ban",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "duration",
+				Description: "Ban duration (optional, omit for permanent)",
+				Required:    false,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{Name: "1 Day", Value: "1d"},
+					{Name: "3 Days", Value: "3d"},
+					{Name: "7 Days", Value: "7d"},
+					{Name: "14 Days", Value: "14d"},
+					{Name: "30 Days", Value: "30d"},
+					{Name: "Permanent", Value: "permanent"},
+				},
+			},
+		},
+	},
+	{
+		Name:        "admin-trade-unban",
+		Description: "Remove a trade ban from a user (admin only)",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionUser,
+				Name:        "user",
+				Description: "The user to unban",
+				Required:    true,
+			},
+		},
+	},
+	{
+		Name:        "admin-trade-bans",
+		Description: "List all active trade bans (admin only)",
+	},
+	{
+		Name:        "admin-trade-reports",
+		Description: "View trade reports (admin only)",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "status",
+				Description: "Filter by status (default: pending)",
+				Required:    false,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{Name: "Pending", Value: "pending"},
+					{Name: "Reviewed", Value: "reviewed"},
+					{Name: "Dismissed", Value: "dismissed"},
+				},
+			},
+		},
+	},
+	{
+		Name:        "admin-trade-report-action",
+		Description: "Take action on a trade report (admin only)",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "report-id",
+				Description: "The report ID to act on",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "action",
+				Description: "Action to take",
+				Required:    true,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{Name: "Dismiss report", Value: "dismiss"},
+					{Name: "Ban reported user", Value: "ban"},
+				},
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "reason",
+				Description: "Reason (used as ban reason if banning, optional for dismiss)",
+				Required:    false,
+			},
+		},
+	},
 }
 
 // registerCommands registers all slash commands with Discord

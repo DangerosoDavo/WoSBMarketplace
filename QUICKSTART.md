@@ -8,18 +8,37 @@ Get the World of Sea Battle Market Bot running in under 10 minutes.
 - [ ] Node.js installed (v18+) for Claude Code CLI
 - [ ] Discord bot token (see [COMPLETE_SETUP_GUIDE.md](COMPLETE_SETUP_GUIDE.md) for details)
 - [ ] Anthropic account (free tier works)
-- [ ] Bot invited to your Discord server
+- [ ] Bot invited to your Discord server with required permissions and intents (see below)
 
 ## 5-Minute Setup
 
-### 1. Clone the Repository
+### 1. Discord Bot Setup (Developer Portal)
+
+Before cloning, ensure your bot has the correct intents and permissions in the [Discord Developer Portal](https://discord.com/developers/applications):
+
+**Privileged Gateway Intents** (Bot tab → Privileged Gateway Intents):
+- [x] **Message Content Intent** - Required for OCR screenshot processing and DM trade relay
+
+**Bot Permissions** (OAuth2 → URL Generator):
+When generating your bot invite URL, select these permissions:
+- `Send Messages` - Respond to commands and relay trade DMs
+- `Embed Links` - Rich embeds for search results and order confirmations
+- `Add Reactions` - Checkmark reactions to confirm DM delivery
+- `Use Slash Commands` - All bot commands
+- `Send Messages in Threads` (optional)
+
+**OAuth2 Scopes**: `bot`, `applications.commands`
+
+**Note on DM Relay**: The bot sends and receives Direct Messages to facilitate player-to-player trading. Users must have "Allow direct messages from server members" enabled in their Discord privacy settings for a server the bot shares with them.
+
+### 2. Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/wosbTrade.git
 cd wosbTrade
 ```
 
-### 2. Install and Authenticate Claude Code
+### 3. Install and Authenticate Claude Code
 
 ```bash
 # Install Claude Code CLI globally
@@ -33,7 +52,7 @@ claude --version
 claude auth status
 ```
 
-### 3. Configure Environment
+### 4. Configure Environment
 
 ```bash
 cp .env.example .env
@@ -50,9 +69,9 @@ DISCORD_TOKEN=your_bot_token_here
 ADMIN_ROLE_ID=your_global_admin_role_id
 ```
 
-You can configure admin roles per-server using Discord commands (recommended) - see step 7 below!
+You can configure admin roles per-server using Discord commands (recommended) - see step 8 below!
 
-### 4. Build and Deploy
+### 5. Build and Deploy
 
 ```bash
 ./scripts/build.sh   # Builds Docker image (~2 min)
@@ -61,7 +80,7 @@ You can configure admin roles per-server using Discord commands (recommended) - 
 
 The deploy script will automatically copy your Claude authentication to the container.
 
-### 5. Verify It's Running
+### 6. Verify It's Running
 
 ```bash
 docker logs -f wosb-market-bot
@@ -74,11 +93,11 @@ Look for:
 ✓ Bot is now running
 ```
 
-### 6. Test in Discord
+### 7. Test in Discord
 
 Type `/stats` in your Discord server. If you see a response, you're done!
 
-### 7. Configure Server Admin Role (In Discord)
+### 8. Configure Server Admin Role (In Discord)
 
 **Option 1: Use Discord command (Recommended)**
 ```
@@ -126,6 +145,49 @@ This command requires "Manage Server" permission and is much easier than editing
 /stats
 ```
 
+### Player Trading (Cross-Server)
+
+The bot includes a full player-to-player trading system with DM relay, allowing players across different servers to trade without joining each other's Discord servers.
+
+**Set up your trader profile:**
+```
+/trade-set-name name:CaptainHook
+```
+
+**Create a trade order:**
+```
+/trade-create type:sell item:Heavy Cannon price:5000 quantity:3 duration:7d
+/trade-create type:buy item:Iron price:100 quantity:50 duration:3d port:Port Royal
+```
+
+**Browse and search orders:**
+```
+/trade-search item:cannon
+/trade-search type:sell min-price:100 max-price:1000
+/trade-my-orders
+```
+
+**Contact a trader:**
+```
+/trade-contact order-id:42
+```
+This opens a DM relay through the bot. Both traders chat via DMs with the bot forwarding messages using in-game names. Conversations auto-close after 30 minutes of inactivity.
+
+**End a conversation:**
+```
+/trade-end
+```
+
+**Cancel your order:**
+```
+/trade-cancel order-id:42
+```
+
+**Report a trader:**
+```
+/trade-report order-id:42 reason:"Posting fake prices"
+```
+
 ### Admin Commands (Requires Admin Role)
 
 **Create tags:**
@@ -138,6 +200,16 @@ This command requires "Manage Server" permission and is much easier than editing
 ```
 /admin-item-list-untagged
 /admin-item-tag "Heavy Cannon" weapon,heavy
+```
+
+**Trade moderation:**
+```
+/admin-trade-ban user:@someone reason:"scamming" duration:7d
+/admin-trade-unban user:@someone
+/admin-trade-bans
+/admin-trade-reports
+/admin-trade-report-action report-id:1 action:ban
+/admin-trade-report-action report-id:2 action:dismiss
 ```
 
 ## Troubleshooting

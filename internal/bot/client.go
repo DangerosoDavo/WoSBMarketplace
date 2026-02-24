@@ -18,12 +18,13 @@ import (
 )
 
 type Bot struct {
-	session           *discordgo.Session
-	db                *database.DB
-	claudeClient      *ocr.ClaudeClient
-	imagePath         string
-	adminRoleID       string
-	submissionManager *SubmissionManager
+	session            *discordgo.Session
+	db                 *database.DB
+	claudeClient       *ocr.ClaudeClient
+	imagePath          string
+	adminRoleID        string
+	submissionManager  *SubmissionManager
+	tradeConversations *TradeConversationManager
 }
 
 type Config struct {
@@ -57,22 +58,25 @@ func New(cfg Config) (*Bot, error) {
 	claudeClient := ocr.NewClaudeClient(cfg.ClaudeCodePath)
 
 	bot := &Bot{
-		session:           session,
-		db:                db,
-		claudeClient:      claudeClient,
-		imagePath:         cfg.ImagePath,
-		adminRoleID:       strings.TrimSpace(cfg.AdminRoleID),
-		submissionManager: NewSubmissionManager(5 * time.Minute),
+		session:            session,
+		db:                 db,
+		claudeClient:       claudeClient,
+		imagePath:          cfg.ImagePath,
+		adminRoleID:        strings.TrimSpace(cfg.AdminRoleID),
+		submissionManager:  NewSubmissionManager(5 * time.Minute),
+		tradeConversations: NewTradeConversationManager(30 * time.Minute),
 	}
 
 	// Set intents
 	session.Identify.Intents = discordgo.IntentsGuilds |
 		discordgo.IntentsGuildMessages |
-		discordgo.IntentMessageContent
+		discordgo.IntentMessageContent |
+		discordgo.IntentsDirectMessages
 
 	// Register handlers
 	session.AddHandler(bot.ready)
 	session.AddHandler(bot.interactionCreate)
+	session.AddHandler(bot.messageCreate)
 
 	return bot, nil
 }
@@ -90,8 +94,13 @@ func (b *Bot) Start() error {
 		return fmt.Errorf("failed to register commands: %w", err)
 	}
 
-	// Start background expiry checker
+	// Start background goroutines
 	go b.expiryChecker()
+	go b.playerOrderExpiryChecker()
+	go b.conversationTimeoutChecker()
+
+	// Recover active conversations from DB into memory
+	b.recoverActiveConversations()
 
 	// Wait for interrupt signal
 	sc := make(chan os.Signal, 1)
@@ -174,6 +183,93 @@ func (b *Bot) isAdmin(guildID string, member *discordgo.Member) bool {
 	}
 
 	return false
+}
+
+// playerOrderExpiryChecker periodically expires player orders
+func (b *Bot) playerOrderExpiryChecker() {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		ctx := context.Background()
+		count, err := b.db.DeleteExpiredPlayerOrders(ctx)
+		if err != nil {
+			log.Printf("Error expiring player orders: %v", err)
+			continue
+		}
+		if count > 0 {
+			log.Printf("Expired %d player orders", count)
+		}
+	}
+}
+
+// conversationTimeoutChecker closes stale trade conversations and notifies both parties
+func (b *Bot) conversationTimeoutChecker() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		ctx := context.Background()
+		stale, err := b.db.GetStaleConversations(ctx, 30*time.Minute)
+		if err != nil {
+			log.Printf("Error getting stale conversations: %v", err)
+			continue
+		}
+
+		for _, conv := range stale {
+			// Close in DB
+			if err := b.db.CloseTradeConversation(ctx, conv.ID); err != nil {
+				log.Printf("Error closing stale conversation %d: %v", conv.ID, err)
+				continue
+			}
+
+			// Remove from memory
+			ac := &ActiveConversation{
+				ConversationID:  conv.ID,
+				InitiatorUserID: conv.InitiatorUserID,
+				CreatorUserID:   conv.CreatorUserID,
+			}
+			b.tradeConversations.Remove(ac)
+
+			// Notify both parties
+			msg := "Your trade conversation has been closed due to inactivity. Use `/trade-search` to find more trades."
+			if ch, err := b.session.UserChannelCreate(conv.InitiatorUserID); err == nil {
+				b.session.ChannelMessageSend(ch.ID, msg)
+			}
+			if ch, err := b.session.UserChannelCreate(conv.CreatorUserID); err == nil {
+				b.session.ChannelMessageSend(ch.ID, msg)
+			}
+
+			log.Printf("Closed stale conversation %d between %s and %s",
+				conv.ID, conv.InitiatorIngameName, conv.CreatorIngameName)
+		}
+	}
+}
+
+// recoverActiveConversations loads active conversations from DB into memory on restart
+func (b *Bot) recoverActiveConversations() {
+	ctx := context.Background()
+	convs, err := b.db.GetAllActiveConversations(ctx)
+	if err != nil {
+		log.Printf("Error recovering active conversations: %v", err)
+		return
+	}
+
+	for _, conv := range convs {
+		ac := &ActiveConversation{
+			ConversationID:      conv.ID,
+			OrderID:             conv.OrderID,
+			InitiatorUserID:     conv.InitiatorUserID,
+			InitiatorIngameName: conv.InitiatorIngameName,
+			CreatorUserID:       conv.CreatorUserID,
+			CreatorIngameName:   conv.CreatorIngameName,
+		}
+		b.tradeConversations.Register(ac)
+	}
+
+	if len(convs) > 0 {
+		log.Printf("Recovered %d active trade conversations", len(convs))
+	}
 }
 
 // hashImage creates a SHA256 hash of an image file

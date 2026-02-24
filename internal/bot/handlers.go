@@ -38,6 +38,8 @@ func (b *Bot) handleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 		b.handlePortCreate(s, i)
 	case strings.HasPrefix(customID, "item_select_"):
 		b.handleItemConfirm(s, i, parts)
+	case strings.HasPrefix(customID, "trade_contact_"):
+		b.handleTradeContactButton(s, i, parts)
 	default:
 		log.Printf("Unknown component interaction: %s", customID)
 	}
@@ -119,6 +121,36 @@ func (b *Bot) handleCommand(s *discordgo.Session, i *discordgo.InteractionCreate
 		b.handleConfigSetAdminRole(s, i)
 	case "config-show":
 		b.handleConfigShow(s, i)
+
+	// Player trading commands
+	case "trade-set-name":
+		b.handleTradeSetName(s, i)
+	case "trade-create":
+		b.handleTradeCreate(s, i)
+	case "trade-search":
+		b.handleTradeSearch(s, i)
+	case "trade-my-orders":
+		b.handleTradeMyOrders(s, i)
+	case "trade-cancel":
+		b.handleTradeCancel(s, i)
+	case "trade-contact":
+		b.handleTradeContact(s, i)
+	case "trade-end":
+		b.handleTradeEnd(s, i)
+	case "trade-report":
+		b.handleTradeReport(s, i)
+
+	// Admin trade moderation commands
+	case "admin-trade-ban":
+		b.handleAdminTradeBan(s, i)
+	case "admin-trade-unban":
+		b.handleAdminTradeUnban(s, i)
+	case "admin-trade-bans":
+		b.handleAdminTradeBans(s, i)
+	case "admin-trade-reports":
+		b.handleAdminTradeReports(s, i)
+	case "admin-trade-report-action":
+		b.handleAdminTradeReportAction(s, i)
 
 	default:
 		b.respondError(s, i, "Unknown command")

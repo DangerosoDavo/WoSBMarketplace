@@ -12,13 +12,27 @@ go run cmd/bot/main.go         # Test locally
 
 ## Essential Commands
 
-### Users
+### Users - Market Data
 ```
 /submit buy [screenshot]       Submit buy orders
 /submit sell [screenshot]      Submit sell orders
 /price <item>                  Find best prices
 /port <name>                   View port orders
+/ports [region]                List all ports
+/items [tags]                  Browse items by tags
 /stats                         Bot statistics
+```
+
+### Users - Player Trading
+```
+/trade-set-name <name>         Set your in-game name
+/trade-create <type> <item> <price> <quantity> <duration>  Create order
+/trade-search [item] [type] [port] [min-price] [max-price] Search orders
+/trade-my-orders               View your active orders
+/trade-cancel <order-id>       Cancel your order
+/trade-contact <order-id>      Start DM conversation with trader
+/trade-end                     End active trade conversation
+/trade-report <order-id> <reason>  Report a trader
 ```
 
 ### Server Setup (Requires "Manage Server" Permission)
@@ -38,6 +52,15 @@ go run cmd/bot/main.go         # Test locally
 /admin-item-list-untagged             View untagged items
 /admin-item-tag <item> <tags>         Tag an item
 /admin-tag-list                       View all tags
+```
+
+### Admins (Trade Moderation)
+```
+/admin-trade-ban <user> <reason> [duration]   Ban user from trading
+/admin-trade-unban <user>                     Remove trade ban
+/admin-trade-bans                             List active bans
+/admin-trade-reports [status]                 View trade reports
+/admin-trade-report-action <id> <action>      Dismiss or ban from report
 ```
 
 ## File Locations
@@ -94,6 +117,44 @@ volumes/data/                  Docker persistent storage
 /ports region:Caribbean                List Caribbean ports
 /items tags:weapon,heavy               Heavy weapons
 ```
+
+### Trading Examples
+```
+/trade-set-name name:CaptainHook                        Set in-game name
+/trade-create type:sell item:cannon price:5000 quantity:3 duration:7d  Sell order
+/trade-create type:buy item:iron price:100 quantity:50 duration:3d port:Port Royal
+/trade-search item:cannon type:sell                      Find sell orders
+/trade-search min-price:100 max-price:500                Price range filter
+/trade-contact order-id:42                               Start DM with trader
+/trade-end                                               Close conversation
+/trade-report order-id:42 reason:"Fake prices"           Report a trader
+```
+
+### Moderation Examples
+```
+/admin-trade-ban user:@scammer reason:"scamming" duration:7d  Temp ban (7 days)
+/admin-trade-ban user:@scammer reason:"repeat offender"       Permanent ban
+/admin-trade-unban user:@someone                              Remove ban
+/admin-trade-bans                                             View all active bans
+/admin-trade-reports                                          View pending reports
+/admin-trade-reports status:dismissed                         View dismissed reports
+/admin-trade-report-action report-id:1 action:ban             Ban from report
+/admin-trade-report-action report-id:2 action:dismiss         Dismiss report
+```
+
+## Discord Bot Permissions
+
+### Required Privileged Intents (Developer Portal)
+- **Message Content Intent** - For OCR processing and DM trade relay
+
+### Required Bot Permissions (Invite URL)
+- `Send Messages`, `Embed Links`, `Add Reactions`, `Use Slash Commands`
+
+### DM Relay Requirements
+- Users must have "Allow direct messages from server members" enabled
+- Bot must share at least one server with both trading parties
+- One active conversation per user at a time
+- Conversations auto-close after 30 minutes of inactivity
 
 ## Troubleshooting
 
